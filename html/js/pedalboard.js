@@ -459,11 +459,116 @@ JqueryClass('pedalboard', {
             ev.preventDefault()
         })
 
+        // Hold empty pedalboard space for 500 ms to zoom in until release.
+        var holdTouch = null
+        var holdTimer = null
+        var holdFrame = null
+        var holdLastFrame = null
+        var suppressHoldTap = false
+
+        function stopHoldZoom() {
+            clearTimeout(holdTimer)
+            holdTimer = null
+            if (holdFrame != null)
+                window.cancelAnimationFrame(holdFrame)
+            holdFrame = null
+            holdLastFrame = null
+        }
+
+        function holdZoomStep(time) {
+            var elapsed = holdLastFrame == null ? 0 : Math.min(time - holdLastFrame, 64)
+            holdLastFrame = time
+            var scale = self.data('scale')
+            var newScale = Math.min(self.data('maxScale'), scale * Math.exp(elapsed * 0.00035))
+            if (newScale > scale)
+                self.pedalboard('zoom', newScale, holdTouch.canvasX, holdTouch.canvasY,
+                    holdTouch.screenX, holdTouch.screenY, 0)
+            if (newScale < self.data('maxScale'))
+                holdFrame = window.requestAnimationFrame(holdZoomStep)
+            else
+                holdFrame = null
+        }
+
+        document.addEventListener('touchstart', function (ev) {
+            stopHoldZoom()
+            holdTouch = null
+            if (!ev.touches || ev.touches.length != 1)
+                return
+
+            suppressHoldTap = false
+            self.data('touchHoldZoom', false)
+            var background = self.data('background')
+            var target = ev.target
+            while (target && target != self[0] && target.parentNode != self[0])
+                target = target.parentNode
+            var cableLayer = target && target.classList &&
+                target.classList.contains('ignore-arrive') && target.classList.contains('hasSVG')
+            if (target != self[0] && (!background || target != background[0]) &&
+                    (!target || target.id != 'styleSVG') && !cableLayer)
+                return
+
+            var t = ev.touches[0]
+            holdTouch = { id: t.identifier, x: t.clientX, y: t.clientY,
+                pageX: t.pageX, pageY: t.pageY }
+            holdTimer = setTimeout(function () {
+                holdTimer = null
+                suppressHoldTap = true
+                lastTapTime = 0
+                self.data('touchHoldZoom', true)
+                var scale = self.data('scale')
+                holdTouch.canvasX = (holdTouch.pageX - self.offset().left) / scale
+                holdTouch.canvasY = (holdTouch.pageY - self.offset().top) / scale
+                holdTouch.screenX = holdTouch.pageX - self.parent().offset().left
+                holdTouch.screenY = holdTouch.pageY - self.parent().offset().top
+                holdFrame = window.requestAnimationFrame(holdZoomStep)
+            }, 500)
+        }, { passive: true, capture: true })
+
+        document.addEventListener('touchmove', function (ev) {
+            if (!holdTouch)
+                return
+            if (!ev.touches || ev.touches.length != 1) {
+                stopHoldZoom()
+                holdTouch = null
+                return
+            }
+            var t = ev.touches[0]
+            var dx = t.clientX - holdTouch.x
+            var dy = t.clientY - holdTouch.y
+            if (t.identifier != holdTouch.id || dx * dx + dy * dy > 100) {
+                stopHoldZoom()
+                holdTouch = null
+            }
+            if (self.data('touchHoldZoom'))
+                ev.preventDefault()
+        }, { passive: false, capture: true })
+
+        function releaseHoldZoom(ev) {
+            stopHoldZoom()
+            holdTouch = null
+            self.data('touchHoldZoom', false)
+            if (suppressHoldTap && ev && ev.cancelable)
+                ev.preventDefault()
+        }
+
+        document.addEventListener('touchend', releaseHoldZoom, { passive: false, capture: true })
+        document.addEventListener('touchcancel', releaseHoldZoom, { passive: false, capture: true })
+        window.addEventListener('blur', releaseHoldZoom)
+        self[0].addEventListener('contextmenu', function (ev) {
+            if (holdTouch || suppressHoldTap)
+                ev.preventDefault()
+        })
+
         var lastTapTime = 0
         var lastTapX = 0
         var lastTapY = 0
 
         self[0].addEventListener('touchend', function (ev) {
+            if (suppressHoldTap) {
+                lastTapTime = 0
+                return
+            }
+
             if (!ev.changedTouches || ev.changedTouches.length != 1)
                 return
 
@@ -905,6 +1010,8 @@ JqueryClass('pedalboard', {
         var screenY = start.pageY - self.parent().offset().top
 
         var moveHandler = function (e) {
+            if (start.touch && self.data('touchHoldZoom'))
+                return
             if (self.data('preventDrag'))
                 return
 
