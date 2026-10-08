@@ -86,7 +86,7 @@ JqueryClass('pedalboard', {
             // The scale is the transform scale() css property that the pedalboard has
             baseScale: 0.5,
             // maxScale is the maximum zoom.
-            maxScale: 1,
+            maxScale: 1.8,
             // wherever to skip zoom animations
             skipAnimations: false,
 
@@ -1023,7 +1023,7 @@ JqueryClass('pedalboard', {
         var scale = self.data('scale')
         var x = plugin.position().left / scale + plugin.width() / 2
         var y = plugin.position().top / scale + plugin.height() / 2
-        self.pedalboard('zoomAt', 1, x, y)
+        self.pedalboard('zoomAt', self.data('maxScale'), x, y)
     },
 
     // Increase zoom level
@@ -1031,13 +1031,16 @@ JqueryClass('pedalboard', {
         var self = $(this)
         var scale = self.data('scale')
         var newScale
-        if (scale == 1)
+        var maxScale = self.data('maxScale')
+        if (scale >= maxScale)
             return
 
-        if (scale >= 0.5)
-            newScale = 1
+        if (scale < 0.5)
+            newScale = Math.min(0.5, maxScale)
+        else if (scale < 1)
+            newScale = Math.min(1, maxScale)
         else
-            newScale = 0.5
+            newScale = maxScale
         if (newScale > scale) {
             var x = $(window).width() / 2
             var y = $(window).height() / 2
@@ -1057,10 +1060,12 @@ JqueryClass('pedalboard', {
         var newScale
         if (scale == self.data('minScale'))
             return
-        if (scale <= 0.5)
-            newScale = self.data('minScale')
+        if (scale > 1)
+            newScale = Math.max(1, self.data('minScale'))
+        else if (scale > 0.5)
+            newScale = Math.max(0.5, self.data('minScale'))
         else
-            newScale = 0.5
+            newScale = self.data('minScale')
         if (newScale < scale) {
             var x = $(window).width() / 2
             var y = $(window).height() / 2
@@ -1181,9 +1186,9 @@ JqueryClass('pedalboard', {
 
         self.data('minScale', newScale)
 
-        // if we are at scale 1, it is very much likely that we do not want to zoom out now
+        // Preserve a close-up view when the pedalboard layout changes.
         // keep current scale if that is the case
-        if (scale == 1 && ! forcedUpdate) {
+        if (scale >= 1 && ! forcedUpdate) {
             var width = viewWidth / newScale
             var height = viewHeight / newScale
             self.width(width)
