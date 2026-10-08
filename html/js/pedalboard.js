@@ -450,11 +450,104 @@ JqueryClass('pedalboard', {
             ev.preventDefault()
         })
 
+        // Two-finger pinch zoom; leave all one-finger events unchanged.
+        var pinch = null
+        var pinchActive = false
+        var suppressPinchTap = false
+
+        function pinchPoints(touches) {
+            var a = touches[0]
+            var b = touches[1]
+            var dx = a.pageX - b.pageX
+            var dy = a.pageY - b.pageY
+            return { x: (a.pageX + b.pageX) / 2, y: (a.pageY + b.pageY) / 2,
+                distance: Math.sqrt(dx * dx + dy * dy) }
+        }
+
+        self[0].addEventListener('touchstart', function (ev) {
+            if (!ev.touches)
+                return
+            if (ev.touches.length == 1) {
+                if (!pinchActive)
+                    suppressPinchTap = false
+                return
+            }
+            if (ev.touches.length != 2) {
+                if (pinchActive) {
+                    pinch = null
+                    ev.preventDefault()
+                    ev.stopImmediatePropagation()
+                }
+                return
+            }
+            if (!self[0].contains(ev.touches[0].target) ||
+                    !self[0].contains(ev.touches[1].target))
+                return
+
+            var points = pinchPoints(ev.touches)
+            if (points.distance <= 0)
+                return
+            var scale = self.data('scale')
+            pinch = { scale: scale, distance: points.distance,
+                first: ev.touches[0].identifier, second: ev.touches[1].identifier,
+                canvasX: (points.x - self.offset().left) / scale,
+                canvasY: (points.y - self.offset().top) / scale }
+            pinchActive = true
+            suppressPinchTap = true
+            lastTapTime = 0
+            ev.preventDefault()
+            ev.stopImmediatePropagation()
+        }, { passive: false, capture: true })
+
+        document.addEventListener('touchmove', function (ev) {
+            if (!pinchActive)
+                return
+            ev.preventDefault()
+            ev.stopImmediatePropagation()
+            if (!pinch || !ev.touches || ev.touches.length != 2)
+                return
+            var a = ev.touches[0].identifier
+            var b = ev.touches[1].identifier
+            if (!((a == pinch.first && b == pinch.second) ||
+                    (a == pinch.second && b == pinch.first)))
+                return
+
+            var points = pinchPoints(ev.touches)
+            var scale = pinch.scale * points.distance / pinch.distance
+            scale = Math.max(self.data('minScale'), Math.min(self.data('maxScale'), scale))
+            self.pedalboard('zoom', scale, pinch.canvasX, pinch.canvasY,
+                points.x - self.parent().offset().left,
+                points.y - self.parent().offset().top, 0)
+        }, { passive: false, capture: true })
+
+        function releasePinch(ev) {
+            if (!pinchActive)
+                return
+            pinch = null
+            lastTapTime = 0
+            if (ev.cancelable)
+                ev.preventDefault()
+            if (!ev.touches || ev.touches.length == 0)
+                pinchActive = false
+        }
+
+        document.addEventListener('touchend', releasePinch, { passive: false, capture: true })
+        document.addEventListener('touchcancel', releasePinch, { passive: false, capture: true })
+        window.addEventListener('blur', function () {
+            pinch = null
+            pinchActive = false
+        })
+
         var lastTapTime = 0
         var lastTapX = 0
         var lastTapY = 0
 
         self[0].addEventListener('touchend', function (ev) {
+            if (suppressPinchTap) {
+                lastTapTime = 0
+                return
+            }
+
             if (!ev.changedTouches || ev.changedTouches.length != 1)
                 return
 
