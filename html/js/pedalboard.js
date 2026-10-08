@@ -334,9 +334,26 @@ JqueryClass('pedalboard', {
             }
         }});
 
-        // Dragging the pedalboard move the view area
+        // Dragging the pedalboard moves the view area
         self.mousedown(function (e) {
             self.pedalboard('drag', e)
+        })
+
+        // Touchscreen: one-finger drag pans the pedalboard
+        self.on('touchstart', function (e) {
+            var oe = e.originalEvent
+            if (!oe.touches || oe.touches.length != 1)
+                return
+
+            var t = oe.touches[0]
+
+            self.pedalboard('drag', {
+                pageX: t.pageX,
+                pageY: t.pageY,
+                touch: true
+            })
+
+            e.preventDefault()
         })
 
         // The mouse wheel is used to zoom in and out
@@ -434,6 +451,33 @@ JqueryClass('pedalboard', {
             self.pedalboard('zoomOut')
             ev.preventDefault()
         })
+
+        var lastTapTime = 0
+        var lastTapX = 0
+        var lastTapY = 0
+
+        self[0].addEventListener('touchend', function (ev) {
+            if (!ev.changedTouches || ev.changedTouches.length != 1)
+                return
+
+            var t = ev.changedTouches[0]
+            var now = Date.now()
+
+            var dt = now - lastTapTime
+            var dx = t.clientX - lastTapX
+            var dy = t.clientY - lastTapY
+            var distance = Math.sqrt(dx * dx + dy * dy)
+
+            if (dt > 0 && dt < 350 && distance < 50) {
+                self.pedalboard('zoomOut')
+                lastTapTime = 0
+                ev.preventDefault()
+            } else {
+                lastTapTime = now
+                lastTapX = t.clientX
+                lastTapY = t.clientY
+            }
+        }, { passive: false, capture: true })
     },
 
     // Check if mouse event has happened over any element of a jquery set in pedalboard
@@ -857,19 +901,33 @@ JqueryClass('pedalboard', {
             if (self.data('preventDrag'))
                 return
 
+            var ev = e.originalEvent || e
+
+            if (ev.touches && ev.touches.length) {
+                ev = ev.touches[0]
+                e.preventDefault()
+            }
+
             self.pedalboard('zoom', scale, canvasX, canvasY,
-                screenX + e.pageX - start.pageX,
-                screenY + e.pageY - start.pageY,
+                screenX + ev.pageX - start.pageX,
+                screenY + ev.pageY - start.pageY,
                 0)
         }
 
         var upHandler = function (e) {
             $(document).unbind('mouseup', upHandler)
             $(document).unbind('mousemove', moveHandler)
+            $(document).unbind('touchmove', moveHandler)
+            $(document).unbind('touchend touchcancel', upHandler)
         }
 
         $(document).bind('mousemove', moveHandler)
         $(document).bind('mouseup', upHandler)
+
+        if (start.touch) {
+            $(document).bind('touchmove', moveHandler)
+            $(document).bind('touchend touchcancel', upHandler)
+        }
     },
 
     // Changes the viewing scale of the pedalboard and position it in a way that
