@@ -453,6 +453,15 @@ JqueryClass('pedalboard', {
             ev.preventDefault()
         })
 
+        // Dismiss the expanded cable picker when a new touch starts outside it.
+        document.addEventListener('touchstart', function (ev) {
+            if (!ev.touches || ev.touches.length != 1)
+                return
+            var input = self.data('expandedInput')
+            if (input && input[0] && !input[0].contains(ev.target))
+                self.pedalboard('colapseInput', input)
+        }, { passive: true, capture: true })
+
         // Two-finger pinch zoom; leave all one-finger events unchanged.
         var pinch = null
         var pinchActive = false
