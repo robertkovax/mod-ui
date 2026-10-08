@@ -1957,9 +1957,11 @@ JqueryClass('pedalboard', {
         var myjacks = []
         var connMgr = self.data('connectionManager')
         connMgr.iterateInstance(plugin.data('instance'), function (jack) {
-            myjacks.push($(jack.data('svg')._container))
+            myjacks.push(jack.data('svg')._container)
         })
-        $('.hasSVG.cable-connected').filter(function(e) {!(e in myjacks)}).css({'z-index': 0})
+        self.find('.hasSVG.cable-connected').filter(function () {
+            return myjacks.indexOf(this) === -1
+        }).css({'z-index': 0})
 
         connMgr.iterateInstance(plugin.data('instance'), function (jack) {
             self.pedalboard('drawJack', jack)
@@ -2380,7 +2382,8 @@ JqueryClass('pedalboard', {
             height: '100%',
             position: 'absolute',
             top: 0,
-            left: 0
+            left: 0,
+            'pointer-events': 'none'
         })
         self.append(canvas)
         canvas.svg()
@@ -2390,7 +2393,8 @@ JqueryClass('pedalboard', {
             height: '100%',
             position: 'absolute',
             top: 0,
-            left: 0
+            left: 0,
+            'pointer-events': 'none'
         })
 
         jack.data('canvas', canvas)
@@ -2445,16 +2449,11 @@ JqueryClass('pedalboard', {
                 if (!jack.hasClass('jack-connected')) {
                     jack.addClass('jack-disconnected')
                     jack.css({
-                        top: 'auto',
-                        left: 'auto',
-                        marginTop: 'auto',
+                        top: 0,
+                        left: 0,
+                        marginTop: 0,
                     })
 
-                    // if jack output previous sibling has a margin-bottom,
-                    // adjust jack top position in accordance
-                    if (jack.data('origin') && jack.data('origin').prev() && jack.data('origin').prev().css('margin-bottom')) {
-                      jack.css('top', parseInt(jack.css('top')) - parseInt(jack.data('origin').prev().css('margin-bottom')))
-                    }
                 }
                 self.pedalboard('drawJack', jack)
             }
@@ -2513,11 +2512,6 @@ JqueryClass('pedalboard', {
             var xo = jack.offset().left / scale - self.offset().left / scale
             var jackOffsetTop = jack.offset().top
 
-            // Adjust jack offset top position
-            // that is sometimes biased by jack destination previous sibling margin bottom
-            if (!force && parseInt(jack.css('top')) === 0 && parseInt(jack.css('bottom')) === 0) {
-              jackOffsetTop = jack.offset().top - jack.position().top
-            }
             var yo = jackOffsetTop / scale - self.offset().top / scale + jack.height() / 2
 
             //if (source.hasClass("mod-audio-output"))
@@ -2662,16 +2656,11 @@ JqueryClass('pedalboard', {
                 input.addClass('input-connected')
 
                 jack.css({
-                    top: 'auto',
-                    left: 'auto',
-                    marginTop: 'auto',
+                    top: 0,
+                    left: 0,
+                    marginTop: 0,
                 })
 
-                // if jack input previous sibling has a margin-bottom,
-                // adjust jack top position in accordance
-                if (jack.data('destination') && jack.data('destination').prev() && jack.data('destination').prev().css('margin-bottom')) {
-                  jack.css('top', parseInt(jack.css('top')) - parseInt(jack.data('destination').prev().css('margin-bottom')))
-                }
             // If output is already connected to this input through another jack, abort connection
             } else {
                 self.pedalboard('disconnect', jack)
@@ -2776,16 +2765,11 @@ JqueryClass('pedalboard', {
 
         } else {
             jack.css({
-                top: 'auto',
-                left: 'auto',
-                marginTop: 'auto',
+                top: 0,
+                left: 0,
+                marginTop: 0,
             })
 
-            // if jack output previous sibling has a margin-bottom,
-            // adjust jack top position in accordance
-            if (jack.data('origin') && jack.data('origin').prev() && jack.data('origin').prev().css('margin-bottom')) {
-              jack.css('top', parseInt(jack.css('top')) - parseInt(jack.data('origin').prev().css('margin-bottom')))
-            }
         }
 
         jack.data('connected', false)
@@ -2821,16 +2805,11 @@ JqueryClass('pedalboard', {
         jacks.each(function () {
             var jack = $(this)
             jack.css({
-                top: 'auto',
-                left: 'auto',
-                marginTop: 'auto',
+                top: 0,
+                left: 0,
+                marginTop: 0,
             })
 
-            // if jack input previous sibling has a margin-bottom,
-            // adjust jack top position in accordance
-            if (jack.position().top !== 0 && jack.data('destination') && jack.data('destination').prev() && jack.data('destination').prev().css('margin-bottom')) {
-              jack.css('top', parseInt(jack.css('top')) - parseInt(jack.data('destination').prev().css('margin-bottom')))
-            }
 
             jack.draggable(count <= 1 ? 'enable' : 'disable')
             self.pedalboard('drawJack', jack)
@@ -2846,6 +2825,8 @@ JqueryClass('pedalboard', {
         var jacks = input.find('[mod-role=output-jack]')
         if (jacks.length < 2 || input.data('expanded'))
             return
+        self.pedalboard('colapseInput')
+        input.addClass('expanded')
         var wrapper = $('<div class="mod-pedal-input-wrapper ignore-arrive">')
         //var arrow = $('<div class="mod-pedal-input-arrow ignore-arrive">').appendTo(wrapper)
         wrapper.appendTo(input)
@@ -2853,6 +2834,7 @@ JqueryClass('pedalboard', {
         //arrow.css('top', wrapper.height() / 2 - 12)
         var jack
         var h = 0;
+        var w = 0;
         for (var i = 0; i < jacks.length; i++) {
             jack = $(jacks[i]);
             h = jack.height();
@@ -2873,10 +2855,8 @@ JqueryClass('pedalboard', {
             self.pedalboard('colapseInput', input)
             return false
         })
-        input.addClass('expanded')
         input.data('expanded', true)
         input.data('wrapper', wrapper)
-        self.pedalboard('colapseInput')
         self.data('expandedInput', input)
     },
     colapseInput: function (input) {
