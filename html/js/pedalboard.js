@@ -339,8 +339,11 @@ JqueryClass('pedalboard', {
             self.pedalboard('drag', e)
         })
 
-        // Touchscreen: one-finger drag pans the pedalboard
+        // Touchscreen: one-finger drag pans only the pedalboard background.
         self.on('touchstart', function (e) {
+            if ($(e.target).closest('.mod-pedal, .mod-input, .mod-output, .mod-pedal-input-wrapper, .mod-actions, input, select, textarea, button, a').length)
+                return
+
             var oe = e.originalEvent
             if (!oe.touches || oe.touches.length != 1)
                 return
@@ -544,6 +547,10 @@ JqueryClass('pedalboard', {
 
         self[0].addEventListener('touchend', function (ev) {
             if (suppressPinchTap) {
+                lastTapTime = 0
+                return
+            }
+            if ($(ev.target).closest('.mod-actions, .mod-input, .mod-output, .mod-pedal-input-wrapper, [mod-role=input-control-port], [mod-role=input-parameter], [mod-role=bypass], input, select, textarea, button, a').length) {
                 lastTapTime = 0
                 return
             }
