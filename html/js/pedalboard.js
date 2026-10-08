@@ -356,27 +356,26 @@ JqueryClass('pedalboard', {
             e.preventDefault()
         })
 
-        // The mouse wheel is used to zoom in and out
-        self.bind('mousewheel', function (e) {
-            // Zoom by mousewheel has been desactivated.
-            // Let's keep the code here so that maybe later this can be a user option
-            if (true) return;
-
-            var ev = e.originalEvent
-
-            // check if mouse is not over a control button
-            if (self.pedalboard('mouseIsOver', ev, self.find('[mod-role=input-control-port]')))
+        // Mouse wheel and trackpad zoom, anchored at the pointer.
+        self[0].addEventListener('wheel', function (ev) {
+            // Preserve wheel interaction with pedal controls and form fields.
+            if ($(ev.target).closest('[mod-role=input-control-port], input, select, textarea, button, a, .mod-actions').length)
                 return
 
-            var maxS = self.data('maxScale')
-            var minS = self.data('minScale')
-            var step = (maxS - minS) / 5
-            var steps = ev.wheelDelta / 120
-            var scale = self.data('scale')
-            var newScale = scale + steps * step
-            newScale = Math.min(maxS, newScale)
-            newScale = Math.max(minS, newScale)
+            var delta = ev.deltaY
+            if (!isFinite(delta) || delta == 0)
+                return
+            // Normalize line/page scrolling to pixels and cap large wheel steps.
+            if (ev.deltaMode == 1)
+                delta *= 16
+            else if (ev.deltaMode == 2)
+                delta *= self.parent().height()
+            delta = Math.max(-120, Math.min(120, delta))
 
+            ev.preventDefault()
+            var scale = self.data('scale')
+            var newScale = scale * Math.exp(-delta * 0.0015)
+            newScale = Math.max(self.data('minScale'), Math.min(self.data('maxScale'), newScale))
             if (newScale == scale)
                 return
 
@@ -384,9 +383,8 @@ JqueryClass('pedalboard', {
             var canvasY = (ev.pageY - self.offset().top) / scale
             var screenX = ev.pageX - self.parent().offset().left
             var screenY = ev.pageY - self.parent().offset().top
-
             self.pedalboard('zoom', newScale, canvasX, canvasY, screenX, screenY, 0)
-        })
+        }, { passive: false })
 
         self.pedalboard('initGestures')
 
